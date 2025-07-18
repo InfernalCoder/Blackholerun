@@ -1,0 +1,46 @@
+# Basic Control Tutorial: "Flight School" Plan
+
+**Goal:** Teach players how to move between tracks (Left/Right arrows) and use their shield (Spacebar).
+
+**Structure & Flow:**
+
+1.  **Introduction (Text Overlay):**
+    *   "Welcome, pilot! Let's get you familiar with your ship's basic controls."
+    *   "Your mission is to survive the Black Hole Run. First, let's learn to navigate the orbital tracks."
+
+2.  **Movement - Left/Right Arrows (Interactive):**
+    *   **Visual:** Ship starts on the middle track. The three tracks are clearly visible.
+    *   **Prompt:** "Use the **LEFT ARROW** key to move to the outer track." (Highlight the left arrow key visually, or show a small icon).
+    *   **Feedback:** Ship moves. The outer track briefly glows green.
+    *   **Success:** "Excellent! You're on the outer track."
+    *   **Prompt:** "Now, use the **RIGHT ARROW** key to return to the middle track." (Highlight the right arrow key).
+    *   **Feedback:** Ship moves. The middle track briefly glows green.
+    *   **Success:** "Perfect! You can now navigate between tracks."
+
+3.  **Shield - Spacebar (Interactive):**
+    *   **Visual:** Ship remains on the middle track. Energy bar is visible.
+    *   **Prompt:** "Your ship is equipped with a shield. It consumes energy but protects you from damage."
+    *   **Prompt:** "Press and hold the **SPACEBAR** to activate your shield." (Highlight the spacebar).
+    *   **Feedback:** Shield visual appears around the ship. Energy bar visibly drains.
+    *   **Success:** "Shield active! Notice your energy draining."
+    *   **Prompt:** "Release the **SPACEBAR** to deactivate your shield."
+    *   **Feedback:** Shield disappears. Energy bar stops draining.
+    *   **Success:** "Shield deactivated. Energy will now recharge slowly." (Maybe show a slight energy regen).
+
+4.  **Combined Action (Optional, but good for reinforcement):**
+    *   **Prompt:** "Try moving to the inner track and activating your shield simultaneously."
+    *   **Feedback:** Player performs actions.
+    *   **Success:** "You're a natural! You've mastered the basics."
+
+5.  **Completion & Transition:**
+    *   **Text Overlay:** "You're ready for the Black Hole Run! Good luck, pilot."
+    *   **Transition:** Fade to the main game or a "Ready to Play?" screen.
+
+**Key Design Principles for the Tutorial:**
+
+*   **Isolation:** No enemies, no time limits, no score pressure during the tutorial. Pure focus on controls.
+*   **Clear Visual Cues:** Highlight the relevant keys, tracks, or UI elements as they are discussed.
+*   **Immediate Feedback:** Actions should have clear and instant visual/audio responses.
+*   **Concise Text:** Keep instructions short and to the point.
+*   **Player-Paced:** Allow the player to take their time with each step.
+*   **No Failure States:** The player cannot "fail" the tutorial. They just keep trying until they get it.

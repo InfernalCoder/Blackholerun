@@ -1,0 +1,72 @@
+## Advanced Mechanics Tutorial: "Survival Strategies"
+
+**Overall Goal:** To provide in-depth understanding and practical experience with the game's core systems beyond basic movement and shielding, enabling players to develop strategic gameplay.
+
+**Key Principles:**
+*   **Modular:** Players can select specific topics from a menu.
+*   **Contextual:** Explain *why* each mechanic is important for survival and scoring.
+*   **Simulated Practice:** Provide controlled, low-pressure environments for hands-on learning where applicable.
+*   **Clear Feedback:** Actions should have immediate and understandable visual/audio responses.
+*   **Visual & Textual:** Combine concise explanations with clear visual demonstrations.
+
+---
+
+### Proposed Tutorial Modules:
+
+**Module 1: Time Dilation & Speed Management**
+
+*   **Concept:** Explain what time dilation is, how it affects your score (negative dilation is good!), and how your chosen track and ship speed influence it. Emphasize that staying on outer tracks and maintaining high speed reduces negative dilation.
+*   **Interactive Scenario:**
+    *   Player starts on the innermost track. A clear UI element shows rapid positive dilation.
+    *   Prompt player to move to the middle track, observing the dilation rate decrease.
+    *   Prompt player to move to the outermost track, observing the dilation rate become negative (or minimal positive).
+    *   Introduce Speed Boosts: Player collects a few boosts, observing their ship's speed increase and the further reduction/improvement of dilation.
+*   **Feedback:** Prominent, real-time display of dilation score/rate. Text overlays like "Dilation Reduced!" or "Speed Increased!"
+
+**Module 2: Energy & Shield Tactics**
+
+*   **Concept:** Detail the energy resource, how shields consume it, and the importance of energy power-ups. Explain that shields provide temporary invulnerability but require careful management.
+*   **Interactive Scenario:**
+    *   Player starts with a partially depleted energy bar.
+    *   Energy Power-Ups appear on tracks. Prompt player to collect them, observing the energy bar refill.
+    *   Simulated Obstacle Approach: An obstacle (e.g., a slow-moving asteroid) approaches. Prompt player to activate their shield just before impact, demonstrating the shield blocking damage and consuming energy.
+    *   Demonstrate shield failure: Allow energy to deplete while shield is active, showing the shield deactivating automatically.
+*   **Feedback:** Visual shield effect, clear energy bar changes, "Shield Blocked!" message, "Energy Depleted!" warning.
+
+**Module 3: Obstacle Identification & Counter-Measures**
+
+*   **Concept:** Introduce each unique obstacle type, its visual cues, behavior, and the best strategy for dealing with it.
+*   **Interactive/Simulated Scenarios (one per obstacle type):**
+    *   **Asteroids:** Simple avoidance practice. Emphasize track switching.
+    *   **Exploding Obstacles:** Explain their pulsing red visual cue. Demonstrate their explosion radius and damage upon impact or expiration. Player practices avoiding the explosion zone.
+    *   **Ball Lightning Mines:** Explain their travel-charge-explode cycle. Demonstrate their track-specific explosion and the large area of effect. Player practices avoiding the specific track the mine is on during its explosion phase.
+    *   **Following Charge:** Explain its relentless chasing behavior. Demonstrate how activating the shield when it collides with the ship will temporarily deactivate the charge, allowing the player to escape. Show the consequence of not shielding (electrocution).
+*   **Feedback:** Unique visual/audio cues for each obstacle. Damage indicators. "Charge Deactivated!" message.
+
+**Module 4: The Escape Sequence**
+
+*   **Concept:** Explain what triggers the escape (surviving the timer) and the mechanics of the escape phase (ship spinning and accelerating outwards).
+*   **Explanatory/Visual Demonstration:**
+    *   This module would likely be a pre-recorded or simulated visual demonstration rather than interactive, as player input is minimal during the actual escape.
+    *   Show the ship reaching the survival timer limit.
+    *   Visually highlight the ship's increasing orbital radius and speed as it spins away from the black hole.
+    *   Explain that the player has successfully completed the run and is now exiting the black hole's gravitational pull.
+*   **Feedback:** Cinematic presentation of the escape.
+
+**Module 5: Scoring & High Scores**
+
+*   **Concept:** Detail how the final score is calculated, emphasizing the contribution of negative dilation (survival time) and collected speed boosts. Explain the high score table and the name entry process.
+*   **Explanatory (primarily text and UI examples):**
+    *   Break down the score formula: `(abs(dilation_score) if dilation_score < 0 else 1) * num_boosts_collected * 100`.
+    *   Provide examples: "A long survival with many boosts and low dilation yields the highest scores!"
+    *   Explain the high score table display and how new high scores are entered.
+*   **Feedback:** Clear display of score components and their impact.
+
+---
+
+### Implementation Considerations:
+
+*   **Dedicated Tutorial Scene/State:** A separate game state (e.g., `TUTORIAL_ADVANCED`) would be ideal to control spawning, player stats, and environmental factors independently from the main game.
+*   **Tutorial UI:** A simple menu to select which advanced tutorial module the player wants to access.
+*   **Reset/Restart:** Each module should have an option to restart it.
+*   **"Skip Tutorial" Option:** For players who feel they don't need the guidance.

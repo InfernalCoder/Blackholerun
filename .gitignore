@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python/
+build/
+develop-eggs/
+dist/
+eggs/
+.egg-info/
+.env/
+.venv/
+venv/
+*.so
+*.manifest
+*.spec
+
+# IDEs
+.idea/
+.vscode/
+.vs/
+
+# Operating System
+.DS_Store
+Thumbs.db
+
+# Backups and temporary files
+backup/
+backup002/
+previous_versions/
+tempjunk/
+*.bak
+*.tmp
+*~
+*.log
+*.swp
+*.swo
+
+# Highscores (if you don't want to track changes to this file)
+highscores.json
+
+# Specific to your project
+black_hole_runV05.txt
+black_hole_runV06.py
+black_hole_runV07.py
+black_hole_runV08 (2).py
+black_hole_runV08.py
+ship_destruction_cinematic.py
+flame_test.py
+lightning_example.png
