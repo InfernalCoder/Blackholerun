@@ -3,8 +3,13 @@ from pygame.locals import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
 import numpy as np
-from asteroid_3d_module import Asteroid3D
+from asteroid_3d_module import Asteroid3D, MAX_OUTER_RADIUS
 import os
+import random # Import the random module
+import sys # Import the sys module
+
+# --- Collision Cooldown ---
+COLLISION_COOLDOWN = 1000 # milliseconds
 
 # --- Asset Path ---
 ASSET_PATH = "assets"
@@ -60,7 +65,7 @@ def draw_asteroid(asteroid):
 # --- Main Function ---
 def main():
     pygame.init()
-    display = (800, 600)
+    display = (1920, 1080)
     pygame.display.set_mode(display, DOUBLEBUF | OPENGL)
     pygame.display.set_caption("OpenGL Asteroid Viewer - Click and Drag to Rotate")
 
@@ -72,8 +77,8 @@ def main():
     glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE)
 
     glLightfv(GL_LIGHT0, GL_POSITION, (0, 0, 1, 0)) # Directional light from the front
-    glLightfv(GL_LIGHT0, GL_AMBIENT, (0.2, 0.2, 0.2, 1.0))
-    glLightfv(GL_LIGHT0, GL_DIFFUSE, (0.8, 0.8, 0.8, 1.0))
+    glLightfv(GL_LIGHT0, GL_AMBIENT, (0.4, 0.4, 0.4, 1.0))
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, (1.0, 1.0, 1.0, 1.0))
 
     gluPerspective(45, (display[0] / display[1]), 0.1, 1000.0)
     glTranslatef(0.0, 0.0, -500) # Move camera back
@@ -87,24 +92,80 @@ def main():
         asteroid_texture_id = glGenTextures(1)
 
     # --- Create Initial Asteroid ---
-    asteroid = Asteroid3D(0, 0, 0, new_outer_radius=100)
+    asteroid = Asteroid3D(0, 0, 0, texture_id=asteroid_texture_id)
     asteroid.texture_id = asteroid_texture_id
 
     # --- Mouse Control Variables ---
     mouse_dragging = False
     last_mouse_pos = (0, 0)
 
-    # --- Main Loop ---
-    while True:
+    # --- Rotation Control Variable ---
+    is_spinning = True # Asteroid spins by default
+
+    # --- Jaggedness Control Variable ---
+    current_jaggedness_factor = 1.0 # Initial jaggedness
+    JAGGEDNESS_STEP = 0.5
+    MAX_JAGGEDNESS = 5.0
+    MIN_JAGGEDNESS = 0.5
+
+    # --- Displacement Control Variable ---
+    current_displacement_strength = 0.0 # Initial displacement
+    DISPLACEMENT_STEP = 5.0
+    MAX_DISPLACEMENT = 500.0
+    MIN_DISPLACEMENT = -500.0 # Allow for both indents and bumps
+
+    # --- Collision Cooldown ---
+    # COLLISION_COOLDOWN = 500 # milliseconds # Moved to global scope
+
+    # --- Shape Randomization Control Variable ---
+    current_shape_randomization_factor = (1.0, 1.0, 1.0) # Initial shape (spherical)
+
+    clock = pygame.time.Clock() # Initialize clock
+    running = True
+    while running:
+        delta_time = clock.tick(60) / 1000.0 # Limit to 60 FPS and get delta time in seconds
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                pygame.quit()
-                return
+                running = False
             elif event.type == pygame.KEYDOWN:
                 if event.key == K_SPACE:
-                    # Create a new random asteroid by providing no size or type
-                    asteroid = Asteroid3D(0, 0, 0)
+                    # Create a new random asteroid with the current jaggedness and displacement factors
+                    asteroid = Asteroid3D(0, 0, 0, jaggedness_factor=current_jaggedness_factor, displacement_strength=current_displacement_strength, shape_randomization_factor=current_shape_randomization_factor, texture_id=asteroid_texture_id)
                     asteroid.texture_id = asteroid_texture_id
+                elif event.key == K_UP:
+                    current_jaggedness_factor = min(MAX_JAGGEDNESS, current_jaggedness_factor + JAGGEDNESS_STEP)
+                    print(f"Jaggedness: {current_jaggedness_factor:.1f}")
+                    # Recreate asteroid with new jaggedness
+                    asteroid = Asteroid3D(0, 0, 0, new_outer_radius=asteroid.outer_radius, jaggedness_factor=current_jaggedness_factor, displacement_strength=current_displacement_strength, shape_randomization_factor=current_shape_randomization_factor, texture_id=asteroid_texture_id)
+                    asteroid.texture_id = asteroid_texture_id
+                elif event.key == K_DOWN:
+                    current_jaggedness_factor = max(MIN_JAGGEDNESS, current_jaggedness_factor - JAGGEDNESS_STEP)
+                    print(f"Jaggedness: {current_jaggedness_factor:.1f}")
+                    # Recreate asteroid with new jaggedness
+                    asteroid = Asteroid3D(0, 0, 0, new_outer_radius=asteroid.outer_radius, jaggedness_factor=current_jaggedness_factor, displacement_strength=current_displacement_strength, shape_randomization_factor=current_shape_randomization_factor, texture_id=asteroid_texture_id)
+                    asteroid.texture_id = asteroid_texture_id
+                elif event.key == K_PERIOD:
+                    # Create the largest possible asteroid, using the same randomization logic as spacebar
+                    # but forcing the outer radius to MAX_OUTER_RADIUS.
+                    asteroid = Asteroid3D(0, 0, 0, new_outer_radius=MAX_OUTER_RADIUS, randomize_all=True, texture_id=asteroid_texture_id)
+                    asteroid.texture_id = asteroid_texture_id
+                elif event.key == K_s:
+                    is_spinning = not is_spinning
+                    print(f"Spinning: {is_spinning}")
+                elif event.key == K_EQUALS: # Plus key
+                    current_displacement_strength = min(MAX_DISPLACEMENT, current_displacement_strength + DISPLACEMENT_STEP)
+                    print(f"Displacement: {current_displacement_strength:.1f}")
+                    # Recreate asteroid with new displacement
+                    asteroid = Asteroid3D(0, 0, 0, new_outer_radius=asteroid.outer_radius, jaggedness_factor=current_jaggedness_factor, displacement_strength=current_displacement_strength, shape_randomization_factor=current_shape_randomization_factor, texture_id=asteroid_texture_id)
+                    asteroid.texture_id = asteroid_texture_id
+                elif event.key == K_MINUS:
+                    current_displacement_strength = max(MIN_DISPLACEMENT, current_displacement_strength - DISPLACEMENT_STEP)
+                    print(f"Displacement: {current_displacement_strength:.1f}")
+                    # Recreate asteroid with new displacement
+                    asteroid = Asteroid3D(0, 0, 0, new_outer_radius=asteroid.outer_radius, jaggedness_factor=current_jaggedness_factor, displacement_strength=current_displacement_strength, shape_randomization_factor=current_shape_randomization_factor, texture_id=asteroid_texture_id)
+                    asteroid.texture_id = asteroid_texture_id
+                elif event.key == K_ESCAPE:
+                    running = False
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 mouse_dragging = True
                 last_mouse_pos = event.pos
@@ -116,14 +177,22 @@ def main():
                 glRotatef(dx, 0, 1, 0) # Yaw
                 glRotatef(dy, 1, 0, 0) # Pitch
 
-        # asteroid.update() # Commented out to disable auto-rotation
+        if is_spinning:
+            asteroid.update(delta_time, asteroid.position)
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-        
+
         draw_asteroid(asteroid)
-        
+
+        # Draw satellites
+        for satellite in asteroid.satellites:
+            draw_asteroid(satellite)
+
         pygame.display.flip()
         pygame.time.wait(10)
+
+    pygame.quit()
+    sys.exit()
 
 if __name__ == '__main__':
     main()

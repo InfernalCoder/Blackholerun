@@ -13,6 +13,7 @@ class GameStateManager:
     def set_state(self, new_state):
         print(f"Transitioning from {self.current_state} to {new_state}")
         self.current_state = new_state
+        self.game.manage_music() # Manage music on every state change
         if new_state == "HIGH_SCORES":
             self.game.on_enter_high_scores_state()
 

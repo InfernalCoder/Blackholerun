@@ -4,18 +4,29 @@ import math
 import numpy as np
 from scipy.spatial import Delaunay
 
-# --- Configuration ---
-NUM_OUTER_FRACTURE_POINTS = 8 # Reduced for asteroids to create larger pieces
-NUM_INNER_FRACTURE_POINTS = 10 # Reduced for asteroids
-MIN_DEBRIS_LIFETIME = 120 # Shorter initial float time
-MAX_DEBRIS_LIFETIME = 240 # Shorter initial float time
-MIN_DEBRIS_SPEED = 0.5 # Faster initial burst
-MAX_DEBRIS_SPEED = 1.5 # Faster initial burst
-MIN_ROTATION_SPEED = -5.0 # Faster rotation
-MAX_ROTATION_SPEED = 5.0 # Faster rotation
+# --- Configuration for Sucking Debris ---
+NUM_OUTER_FRACTURE_POINTS_SUCK = 8
+NUM_INNER_FRACTURE_POINTS_SUCK = 10
+MIN_DEBRIS_LIFETIME_SUCK = 120
+MAX_DEBRIS_LIFETIME_SUCK = 240
+MIN_DEBRIS_SPEED_SUCK = 0.5
+MAX_DEBRIS_SPEED_SUCK = 1.5
+MIN_ROTATION_SPEED_SUCK = -5.0
+MAX_ROTATION_SPEED_SUCK = 5.0
+
+# --- Configuration for Exploding Debris ---
+NUM_OUTER_FRACTURE_POINTS_EXPLODE = 10
+NUM_INNER_FRACTURE_POINTS_EXPLODE = 12
+MIN_DEBRIS_LIFETIME_EXPLODE = 60  # Shorter lifetime for faster fade
+MAX_DEBRIS_LIFETIME_EXPLODE = 120
+MIN_DEBRIS_SPEED_EXPLODE = 2.0 # Faster outward speed
+MAX_DEBRIS_SPEED_EXPLODE = 4.0
+MIN_ROTATION_SPEED_EXPLODE = -8.0 # Faster rotation
+MAX_ROTATION_SPEED_EXPLODE = 8.0
+
 
 class AsteroidDebrisPiece:
-    """Represents a single, cropped piece of a shattered asteroid."""
+    """Represents a single, cropped piece of a shattered asteroid that gets sucked into the black hole."""
     def __init__(self, image, x, y, velocity, rotation_speed, game, animated_color=(255,255,255)):
         self.game = game
         self.original_image = image
@@ -25,7 +36,7 @@ class AsteroidDebrisPiece:
         self.velocity = velocity
         self.rotation_speed = rotation_speed
         self.rotation_angle = 0 # Start with no rotation
-        self.lifetime = random.randint(MIN_DEBRIS_LIFETIME, MAX_DEBRIS_LIFETIME) # Initial float time
+        self.lifetime = random.randint(MIN_DEBRIS_LIFETIME_SUCK, MAX_DEBRIS_LIFETIME_SUCK) # Initial float time
         self.alpha = 255
         self.sucked_in = False
         self.suck_in_timer = self.lifetime // 2 # Start sucking in after half initial float time
@@ -92,10 +103,86 @@ class AsteroidDebrisPiece:
             rect = rotated_image.get_rect(center=(self.x - camera_x, self.y - camera_y))
             surface.blit(rotated_image, rect)
 
+class ExplodingDebrisPiece:
+    """Represents a single, cropped piece of a shattered asteroid that flies outwards."""
+    def __init__(self, image, x, y, velocity, rotation_speed, animated_color=(255,255,255)):
+        self.original_image = image
+        self.image = self.original_image.copy()
+        self.x = x
+        self.y = y
+        self.velocity = velocity
+        self.rotation_speed = rotation_speed
+        self.rotation_angle = 0
+        self.lifetime = random.randint(MIN_DEBRIS_LIFETIME_EXPLODE, MAX_DEBRIS_LIFETIME_EXPLODE)
+        self.max_lifetime = MAX_DEBRIS_LIFETIME_EXPLODE
+        self.alpha = 255
+        self.animated_color = animated_color
+
+    def update(self, dt_factor=1.0):
+        """Updates the position, rotation, and fades out the debris piece."""
+        self.x += self.velocity[0] * dt_factor
+        self.y += self.velocity[1] * dt_factor
+        self.rotation_angle += self.rotation_speed * dt_factor
+        self.lifetime -= 1 * dt_factor
+
+        # Fade out over its lifetime
+        if self.lifetime <= 0:
+            self.alpha = 0
+        else:
+            self.alpha = int(255 * (self.lifetime / self.max_lifetime))
+
+    def draw(self, surface, camera_x=0, camera_y=0):
+        """Draws the rotated and faded debris piece to the screen."""
+        if self.lifetime > 0:
+            rotated_image = pygame.transform.rotate(self.original_image, self.rotation_angle)
+            
+            # Apply the animated color tint
+            tinted_image = pygame.Surface(rotated_image.get_size(), pygame.SRCALPHA)
+            tinted_image.fill(self.animated_color)
+            rotated_image.blit(tinted_image, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+
+            if self.alpha < 255:
+                alpha_surface = pygame.Surface(rotated_image.get_size(), pygame.SRCALPHA)
+                alpha_surface.fill((255, 255, 255, self.alpha))
+                rotated_image.blit(alpha_surface, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+            
+            rect = rotated_image.get_rect(center=(self.x - camera_x, self.y - camera_y))
+            surface.blit(rotated_image, rect)
+
 def create_asteroid_debris(asteroid_image, center_x, center_y, game, animated_color=(255,255,255)):
     """
-    Generates a list of AsteroidDebrisPiece objects by shattering the asteroid's image
-    using Delaunay triangulation.
+    Generates a list of AsteroidDebrisPiece objects (sucked inwards) by shattering the asteroid's image.
+    """
+    return _create_debris_base(
+        asteroid_image, center_x, center_y, animated_color,
+        piece_class=AsteroidDebrisPiece,
+        num_outer_points=NUM_OUTER_FRACTURE_POINTS_SUCK,
+        num_inner_points=NUM_INNER_FRACTURE_POINTS_SUCK,
+        min_speed=MIN_DEBRIS_SPEED_SUCK,
+        max_speed=MAX_DEBRIS_SPEED_SUCK,
+        min_rot_speed=MIN_ROTATION_SPEED_SUCK,
+        max_rot_speed=MAX_ROTATION_SPEED_SUCK,
+        game=game
+    )
+
+def create_exploding_debris(asteroid_image, center_x, center_y, animated_color=(255,255,255)):
+    """
+    Generates a list of ExplodingDebrisPiece objects (flies outwards) by shattering the asteroid's image.
+    """
+    return _create_debris_base(
+        asteroid_image, center_x, center_y, animated_color,
+        piece_class=ExplodingDebrisPiece,
+        num_outer_points=NUM_OUTER_FRACTURE_POINTS_EXPLODE,
+        num_inner_points=NUM_INNER_FRACTURE_POINTS_EXPLODE,
+        min_speed=MIN_DEBRIS_SPEED_EXPLODE,
+        max_speed=MAX_DEBRIS_SPEED_EXPLODE,
+        min_rot_speed=MIN_ROTATION_SPEED_EXPLODE,
+        max_rot_speed=MAX_ROTATION_SPEED_EXPLODE
+    )
+
+def _create_debris_base(asteroid_image, center_x, center_y, animated_color, piece_class, num_outer_points, num_inner_points, min_speed, max_speed, min_rot_speed, max_rot_speed, game=None):
+    """
+    Base function to generate debris pieces from an image using Delaunay triangulation.
     """
     debris_list = []
     img_width, img_height = asteroid_image.get_size()
@@ -104,16 +191,12 @@ def create_asteroid_debris(asteroid_image, center_x, center_y, game, animated_co
 
     points = []
     # 1. Generate points for triangulation
-    # Add corners for better boundary
     points.extend([img_rect.topleft, img_rect.topright, img_rect.bottomleft, img_rect.bottomright])
-    # Add center point
     points.append(img_rect.center)
-    # Add inner points
-    for _ in range(NUM_INNER_FRACTURE_POINTS):
+    for _ in range(num_inner_points):
         points.append((random.randint(0, img_width), random.randint(0, img_height)))
-    # Add outer points
-    base_angle_step = (2 * math.pi) / NUM_OUTER_FRACTURE_POINTS
-    for i in range(NUM_OUTER_FRACTURE_POINTS):
+    base_angle_step = (2 * math.pi) / num_outer_points
+    for i in range(num_outer_points):
         angle = base_angle_step * i + random.uniform(-0.1, 0.1)
         distance = random.uniform(max_radius * 0.9, max_radius * 1.1)
         points.append((
@@ -132,13 +215,11 @@ def create_asteroid_debris(asteroid_image, center_x, center_y, game, animated_co
     for simplex in tri.simplices:
         triangle_points = [tuple(points[i]) for i in simplex]
 
-        # Calculate bounding box for the triangle
         min_x = min(p[0] for p in triangle_points)
         max_x = max(p[0] for p in triangle_points)
         min_y = min(p[1] for p in triangle_points)
         max_y = max(p[1] for p in triangle_points)
         
-        # Clamp bounding box to image dimensions
         min_x, max_x = max(0, min_x), min(img_width, max_x)
         min_y, max_y = max(0, min_y), min(img_height, max_y)
 
@@ -148,20 +229,14 @@ def create_asteroid_debris(asteroid_image, center_x, center_y, game, animated_co
         if bbox_width < 1 or bbox_height < 1:
             continue
 
-        # Create a cropped surface for just this piece
         cropped_part = pygame.Surface((bbox_width, bbox_height), pygame.SRCALPHA)
         cropped_part.blit(asteroid_image, (0, 0), area=pygame.Rect(min_x, min_y, bbox_width, bbox_height))
 
-        # Create the mask for the cropped piece
         mask = pygame.Surface((bbox_width, bbox_height), pygame.SRCALPHA)
-        # Translate triangle points to be relative to the cropped surface
         translated_points = [(p[0] - min_x, p[1] - min_y) for p in triangle_points]
-        pygame.draw.polygon(mask, (255, 255, 255, 255), translated_points) # White mask
-
-        # Apply the mask
+        pygame.draw.polygon(mask, (255, 255, 255, 255), translated_points)
         cropped_part.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
 
-        # Calculate initial position and velocity
         piece_center_x = min_x + bbox_width / 2
         piece_center_y = min_y + bbox_height / 2
         
@@ -169,16 +244,20 @@ def create_asteroid_debris(asteroid_image, center_x, center_y, game, animated_co
         initial_pos_y = center_y - img_height / 2 + piece_center_y
 
         debris_angle = math.atan2(piece_center_y - img_rect.centery, piece_center_x - img_rect.centerx)
-        debris_angle += random.uniform(-math.pi / 8, math.pi / 8) # Wider spread for asteroid debris
+        debris_angle += random.uniform(-math.pi / 8, math.pi / 8)
         
         dist_from_center = math.hypot(piece_center_x - img_rect.centery, piece_center_y - img_rect.centerx)
-        speed_modifier = 0.5 + (dist_from_center / max_radius) # Pieces further from center get more speed
-        debris_speed = random.uniform(MIN_DEBRIS_SPEED, MAX_DEBRIS_SPEED) * speed_modifier
+        speed_modifier = 0.5 + (dist_from_center / max_radius)
+        debris_speed = random.uniform(min_speed, max_speed) * speed_modifier
         
         velocity = (math.cos(debris_angle) * debris_speed, math.sin(debris_angle) * debris_speed)
-        rotation_speed = random.uniform(MIN_ROTATION_SPEED, MAX_ROTATION_SPEED)
+        rotation_speed = random.uniform(min_rot_speed, max_rot_speed)
 
-        debris_list.append(AsteroidDebrisPiece(cropped_part, initial_pos_x, initial_pos_y, velocity, rotation_speed, game, animated_color))
+        if game:
+            debris_list.append(piece_class(cropped_part, initial_pos_x, initial_pos_y, velocity, rotation_speed, game, animated_color))
+        else:
+            debris_list.append(piece_class(cropped_part, initial_pos_x, initial_pos_y, velocity, rotation_speed, animated_color))
+
 
     return debris_list
 
@@ -205,14 +284,16 @@ if __name__ == '__main__':
     test_asteroid_image = pygame.Surface((100, 100), pygame.SRCALPHA)
     pygame.draw.circle(test_asteroid_image, (150, 100, 50), (50, 50), 50)
 
-    debris_pieces = []
-    exploding = False
+    sucking_debris_pieces = []
+    exploding_debris_pieces = []
 
     def reset_explosion():
-        global debris_pieces, exploding
-        # Pass a dummy animated_color for testing (e.g., a bright red)
-        debris_pieces = create_asteroid_debris(test_asteroid_image, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2, mock_game, (255, 100, 100))
-        exploding = True # Start exploding immediately for test
+        global sucking_debris_pieces, exploding_debris_pieces
+        # Test sucking debris
+        sucking_debris_pieces = create_asteroid_debris(test_asteroid_image, SCREEN_WIDTH // 4, SCREEN_HEIGHT // 2, mock_game, (255, 100, 100))
+        # Test exploding debris
+        exploding_debris_pieces = create_exploding_debris(test_asteroid_image, SCREEN_WIDTH * 3 // 4, SCREEN_HEIGHT // 2, (100, 255, 100))
+
 
     reset_explosion()
 
@@ -230,13 +311,24 @@ if __name__ == '__main__':
         # Draw black hole center for visual reference of sucking
         pygame.draw.circle(screen, (0,0,0), (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2), 60)
 
-        active_debris = []
-        for piece in debris_pieces:
+        # Update and draw sucking debris
+        active_sucking_debris = []
+        for piece in sucking_debris_pieces:
             piece.update()
             if piece.lifetime > 0:
                 piece.draw(screen)
-                active_debris.append(piece)
-        debris_pieces = active_debris # Remove dead pieces
+                active_sucking_debris.append(piece)
+        sucking_debris_pieces = active_sucking_debris
+
+        # Update and draw exploding debris
+        active_exploding_debris = []
+        for piece in exploding_debris_pieces:
+            piece.update()
+            if piece.lifetime > 0:
+                piece.draw(screen)
+                active_exploding_debris.append(piece)
+        exploding_debris_pieces = active_exploding_debris
+
 
         pygame.display.flip()
         clock.tick(60)

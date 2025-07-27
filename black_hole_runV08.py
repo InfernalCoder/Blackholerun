@@ -11,7 +11,7 @@ from game_state_module import GameStateManager
 from particle_module import SuckingParticleSystem, BoostParticleSystem, PowerUpParticleSystem, ExplosionParticleSystem
 from ball_lightning_mine_module import BallLightningMine
 from ship_destruction_cinematic import ShipDestructionCinematic
-from asteroid_destruction_module import create_asteroid_debris
+from asteroid_destruction_module import create_asteroid_debris, create_exploding_debris
 from crystal_module import Crystal, load_crystal_texture, CRYSTAL_COLORS
 
 import os
@@ -75,6 +75,10 @@ class Game:
         self.offset_x = 0
         self.offset_y = 0
 
+        self.menu_music_path = os.path.join(ASSET_PATH, "stellar_thrills.mp3")
+        self.game_music_path = os.path.join(ASSET_PATH, "guideons_wrath.mp3")
+        self.current_music_path = None
+
         # Initial resize calculation based on actual window size
         current_w, current_h = self.screen.get_size()
         current_aspect_ratio = current_w / current_h
@@ -102,6 +106,7 @@ class Game:
         self.initialize_ui_elements()
         
         self.state_manager = GameStateManager("SPLASH", self)
+        self.manage_music()
 
     def load_assets(self):
         load_asteroid_textures()
@@ -145,12 +150,39 @@ class Game:
         for sound in self.mini_explosion_sounds:
             sound.set_volume(0.2)
 
+        self.rock_break_sounds = []
+        for i in range(1, 6):
+            try:
+                sound_path = os.path.join(ASSET_PATH, f"rock_break{i:02d}.mp3")
+                sound = pygame.mixer.Sound(sound_path)
+                sound.set_volume(0.3)
+                self.rock_break_sounds.append(sound)
+            except pygame.error as e:
+                print(f"Could not load sound {sound_path}: {e}")
+
         try:
             pygame.mixer.music.load(os.path.join(ASSET_PATH, "stellar_thrills.mp3"))
             pygame.mixer.music.play(-1)
             pygame.mixer.music.set_volume(0.5)
         except pygame.error as e:
-            print(f"Error loading or playing music: {e}")
+            print(f"Could not load sound {sound_path}: {e}")
+
+    def manage_music(self):
+        target_music = None
+        if self.state_manager.get_state() in ["SPLASH", "MENU", "HIGH_SCORES", "GAME_OVER", "ESCAPED", "ESCAPED_INPUT_NAME"]:
+            target_music = self.menu_music_path
+        elif self.state_manager.get_state() in ["GAME", "ESCAPING", "ELECTROCUTED", "CINEMATIC", "PAUSED"]:
+            target_music = self.game_music_path
+
+        if target_music and target_music != self.current_music_path:
+            try:
+                pygame.mixer.music.load(target_music)
+                pygame.mixer.music.play(-1)
+                pygame.mixer.music.set_volume(0.5)
+                self.current_music_path = target_music
+                print(f"Playing music: {target_music}")
+            except pygame.error as e:
+                print(f"Error playing music {target_music}: {e}")
 
     def initialize_game_objects(self):
         self.player_ship = Ship(self.screen_width, self.screen_height, self.ship_image_orig)
@@ -173,6 +205,7 @@ class Game:
         self.ship_debris = []
         self.cinematic_player = None # New: To manage the cinematic
         self.sucking_debris = [] # New list for asteroid debris
+        self.exploding_debris = [] # New list for exploding debris
         self.reset_game_variables()
 
     def initialize_ui_elements(self):
@@ -270,6 +303,7 @@ class Game:
         self.ship_debris.clear()
         self.cinematic_player = None # Reset cinematic player
         self.sucking_debris.clear() # Clear asteroid debris
+        self.exploding_debris.clear()
         self.following_charge.deactivate()
         self.charge_spawn_timer = 0
         self.dilation_score = 0
@@ -496,6 +530,11 @@ class Game:
             if debris.lifetime <= 0:
                 self.sucking_debris.remove(debris)
 
+        for debris in self.exploding_debris[:]:
+            debris.update()
+            if debris.lifetime <= 0:
+                self.exploding_debris.remove(debris)
+
         # Update ship debris after it's created
         if self.player_ship.is_destroyed:
             for piece in self.ship_debris[:]:
@@ -584,7 +623,7 @@ class Game:
             else:
                 obstacle_x = self.original_screen_width // 2 + obstacle.radius * math.cos(obstacle.angle)
                 obstacle_y = self.original_screen_height // 2 + obstacle.radius * math.sin(obstacle.angle)
-                if obstacle.track == self.player_ship.track and check_collision(self.player_ship.radius, self.player_ship.x, self.player_ship.y, obstacle.obstacle_radius, obstacle_x, obstacle_y):
+                if obstacle.track == self.player_ship.track and not getattr(obstacle, 'exploded', False) and check_collision(self.player_ship.radius, self.player_ship.x, self.player_ship.y, obstacle.obstacle_radius, obstacle_x, obstacle_y):
                     # Get color from the asteroid that was hit and create particles at its location
                     obstacle_color = ASTEROID_COLORS.get(obstacle.asteroid.color_key, self.red)
                     effect_position = (obstacle_x, obstacle_y)
@@ -596,14 +635,24 @@ class Game:
                     else:
                         damage = 10 if isinstance(obstacle, ExplodingObstacle) else 5
                         self.player_ship.take_damage(damage)
-                        self.obstacles.remove(obstacle)
-                        # Create asteroid debris
-                        asteroid_image_to_shatter = obstacle.asteroid.get_current_image()
-                        # Calculate the animated color of the asteroid at the moment of destruction
-                        base_color = ASTEROID_COLORS.get(obstacle.asteroid.color_key, self.red)
-                        brightness_factor = ANIMATION_SEQUENCE_INDICES[obstacle.asteroid.current_animation_frame_index] / 7.0
-                        animated_color = tuple(min(255, int(c * (0.5 + brightness_factor * 0.5))) for c in base_color)
-                        self.sucking_debris.extend(create_asteroid_debris(asteroid_image_to_shatter, obstacle_x, obstacle_y, self, animated_color))
+
+                        if isinstance(obstacle, ExplodingObstacle):
+                            obstacle.exploded = True
+                            random.choice(self.mini_explosion_sounds).play()
+                            # Create exploding debris that flies outwards
+                            asteroid_image_to_shatter = obstacle.asteroid.get_current_image()
+                            animated_color = obstacle.color # Use the obstacle's current glow color
+                            self.exploding_debris.extend(create_exploding_debris(asteroid_image_to_shatter, obstacle_x, obstacle_y, animated_color))
+                        else:
+                            self.obstacles.remove(obstacle)
+                            if self.rock_break_sounds:
+                                random.choice(self.rock_break_sounds).play()
+                            # Create regular debris that gets sucked in
+                            asteroid_image_to_shatter = obstacle.asteroid.get_current_image()
+                            base_color = ASTEROID_COLORS.get(obstacle.asteroid.color_key, self.red)
+                            brightness_factor = ANIMATION_SEQUENCE_INDICES[obstacle.asteroid.current_animation_frame_index] / 7.0
+                            animated_color = tuple(min(255, int(c * (0.5 + brightness_factor * 0.5))) for c in base_color)
+                            self.sucking_debris.extend(create_asteroid_debris(asteroid_image_to_shatter, obstacle_x, obstacle_y, self, animated_color))
 
         # Ship with Following Charge
         if self.following_charge.active:
@@ -768,6 +817,8 @@ class Game:
         for effect in self.particle_effects:
             effect.draw(game_surface)
         for debris in self.sucking_debris:
+            debris.draw(game_surface)
+        for debris in self.exploding_debris:
             debris.draw(game_surface)
         self.draw_game_ui(game_surface)
 
@@ -1341,8 +1392,30 @@ class ExplodingObstacle(Obstacle):
 
     def draw(self, game_surface, camera_x=0, camera_y=0):
         if self.exploded:
-            current_radius = int(round(self.explosion_radius * (self.explosion_timer / self.explosion_duration)))
-            pygame.draw.circle(game_surface, self.explosion_color, (int(round(self.x - camera_x)), int(round(self.y - camera_y))), current_radius)
+            progress = self.explosion_timer / self.explosion_duration
+            # Use an easing function for more dynamic expansion
+            eased_progress = 1 - (1 - progress)**3
+            base_radius = self.explosion_radius * eased_progress
+
+            # Create a temporary surface for alpha blending
+            max_radius = int(round(base_radius))
+            if max_radius <= 0: return
+            
+            explosion_surf = pygame.Surface((max_radius * 2, max_radius * 2), pygame.SRCALPHA)
+            center = (max_radius, max_radius)
+
+            # Draw layers from largest to smallest for correct blending
+            pygame.draw.circle(explosion_surf, (255, 255, 0, 100), center, max_radius) # Yellow outer glow
+            if base_radius > 5:
+                pygame.draw.circle(explosion_surf, (255, 165, 0, 150), center, int(round(base_radius * 0.8))) # Orange middle
+            if base_radius > 10:
+                pygame.draw.circle(explosion_surf, (255, 0, 0, 200), center, int(round(base_radius * 0.2))) # Red core
+            
+            # Blit the combined explosion surface to the main screen
+            pos_x = int(round(self.x - camera_x))
+            pos_y = int(round(self.y - camera_y))
+            game_surface.blit(explosion_surf, (pos_x - max_radius, pos_y - max_radius))
+
         else:
             super().draw(game_surface, camera_x, camera_y)
 
