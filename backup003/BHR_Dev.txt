@@ -1,0 +1,79 @@
+# Black Hole Run - Development Plan
+
+This document outlines the development roadmap for "Black Hole Run," incorporating brainstormed features and enhancements. Each item includes a status indicator for tracking progress.
+
+## Status Key:
+- [ ] To Do
+- [P] In Progress
+- [X] Done
+
+---
+
+## I. Core Gameplay Enhancements
+
+### A. New Obstacle Types
+- [ ] Gravitational Anomalies (pull/push zones)
+- [ ] Wormholes/Portals (teleportation)
+- [ ] Debris Fields (visual obstruction)
+
+### B. New Power-Ups/Abilities
+- [ ] Time Slowdown (temporarily slows game)
+- [ ] EMP Burst (disables/pushes charge)
+- [ ] Repair Kit (restores hull integrity)
+- [ ] Score Multiplier (boosts score gain)
+
+### C. Dynamic Track Behavior
+- [ ] Collapsing Tracks (temporary instability/disappearance)
+- [ ] Track Shifting (tracks drift inwards/outwards)
+
+### D. Black Hole Interaction
+- [ ] Pulsating Gravity (periodic strength changes)
+- [ ] Event Horizon Warning (visual/audio cues for inner zone)
+
+## II. Visual & Audio Polish
+
+### A. Enhanced Backgrounds
+- [ ] More detailed nebulae/galaxies (parallax)
+- [ ] Subtle black hole accretion disk effects
+
+### B. Particle System Overhaul
+- [ ] Varied particle effects (collisions, boosts, power-ups)
+- [ ] Speed lines (intensify with ship speed)
+
+### C. Ship Visuals
+- [ ] Damage states for ship (visual degradation)
+- [ ] Subtle thruster flames/exhaust trails
+
+### D. Sound Design
+- [ ] Unique SFX for each obstacle type
+- [ ] Dynamic music (intensity changes)
+- [ ] Voice alerts for critical events
+
+### E. UI/HUD Improvements
+- [ ] Visually engaging health/energy bars
+- [ ] Subtle screen shake on heavy impacts
+
+## III. User Experience & Replayability
+
+### A. Achievements/Challenges
+- [ ] Implement in-game achievements system
+- [ ] Define specific achievement goals
+
+### B. Tutorial Mode
+- [ ] Basic controls tutorial
+- [ ] Advanced mechanics tutorial
+
+### C. Pause Menu
+- [ ] Implement pause functionality
+- [ ] Options: Resume, Restart, Quit
+
+### D. End-Game Summary
+- [ ] Display detailed stats (time survived, boosts, damage)
+
+---
+
+## IV. Technical / Refactoring (Implicit from brainstorming)
+
+- [ ] Review and refactor existing code for maintainability and scalability.
+- [ ] Optimize performance for new visual effects.
+- [ ] Ensure consistent asset loading and management.

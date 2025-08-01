@@ -146,5 +146,5 @@ class PowerUpParticleSystem(AdvancedParticleSystem):
         super().__init__(position, (255, 255, 0))
 
 class ExplosionParticleSystem(AdvancedParticleSystem):
-    def __init__(self, position):
-        super().__init__(position, (255, 165, 0)) # Orange color for explosion
+    def __init__(self, position, color): # Now accepts color
+        super().__init__(position, color) # Passes the received color

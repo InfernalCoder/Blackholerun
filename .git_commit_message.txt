@@ -1,1 +1,7 @@
-Remove black_hole_runV09.py from version control
+feat: Add dynamic explosion effects and music
+
+- Implemented a multi-layered, colored explosion for the ExplodingObstacle.
+- Added particle debris that flies outwards when an ExplodingObstacle is destroyed.
+- Added random explosion sounds for both regular and exploding asteroids.
+- Implemented a music manager to switch between menu and gameplay music tracks.
+- Fixed a bug that caused the ship to be instantly destroyed by exploding asteroids.

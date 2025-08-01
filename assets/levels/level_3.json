@@ -1,0 +1,27 @@
+{
+  "level_name": "Guideon's Wrath",
+  "duration": 75,
+  "music": "guideons_wrath.mp3",
+  "events": [
+    { "time": 3, "type": "ASTEROID", "track": 0 },
+    { "time": 4, "type": "ASTEROID", "track": 2 },
+    { "time": 17, "type": "SPEED_BOOST", "track": 0 },
+    { "time": 8, "type": "PIRATE", "track": 1 },
+    { "time": 14, "type": "EXPLODING_ASTEROID", "track": 0 },
+    { "time": 18, "type": "SPEED_BOOST", "track": 2 },
+    { "time": 22, "type": "MINE", "track": 1 },
+    { "time": 25, "type": "ASTEROID", "track": 0 },
+    { "time": 29, "type": "PIRATE", "track": 2 },
+    { "time": 35, "type": "POWERUP_ENERGY", "track": 0 },
+    { "time": 38, "type": "EXPLODING_ASTEROID", "track": 2 },
+    { "time": 42, "type": "ASTEROID", "track": 1 },
+    { "time": 43, "type": "ASTEROID", "track": 0 },
+    { "time": 44, "type": "SPEED_BOOST", "track": 1 },
+    { "time": 48, "type": "MINE", "track": 2 },
+    { "time": 54, "type": "PIRATE", "track": 0 },
+    { "time": 60, "type": "ASTEROID", "track": 0 },
+    { "time": 60, "type": "SPEED_BOOST", "track": 1 },
+    { "time": 61, "type": "ASTEROID", "track": 1 },
+    { "time": 62, "type": "ASTEROID", "track": 2 }
+  ]
+}

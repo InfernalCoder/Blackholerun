@@ -1,0 +1,24 @@
+{
+  "level_name": "Debris Field",
+  "duration": 45,
+  "music": "stellar_thrills.mp3",
+  "events": [
+    { "time": 3, "type": "ASTEROID", "track": 1 },
+    { "time": 3, "type": "AUDIO_CUE", "sound": "vo_stay_away.mp3" },
+    { "time": 6, "type": "SPEED_BOOST", "track": 2 },
+    { "time": 8, "type": "ASTEROID", "track": 0 },
+    { "time": 12, "type": "ASTEROID", "track": 2 },
+    { "time": 13, "type": "AUDIO_CUE", "sound": "vo_watch_asteroids.mp3" },
+    { "time": 15, "type": "POWERUP_ENERGY", "track": 1 },
+    { "time": 17, "type": "SPEED_BOOST", "track": 0 },
+    { "time": 18, "type": "ASTEROID", "track": 1 },
+    { "time": 22, "type": "ASTEROID", "track": 0 },
+    { "time": 23, "type": "ASTEROID", "track": 2 },
+    { "time": 28, "type": "SPEED_BOOST", "track": 2 },
+    { "time": 32, "type": "ASTEROID", "track": 1 },
+    { "time": 33, "type": "ASTEROID", "track": 2 },
+    { "time": 35, "type": "SPEED_BOOST", "track": 1 },
+    { "time": 38, "type": "ASTEROID", "track": 0 },
+    { "time": 39, "type": "ASTEROID", "track": 1 }
+  ]
+}

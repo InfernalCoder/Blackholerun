@@ -33,7 +33,7 @@ class GameStateManager:
                 self.game.handle_game_events(event)
             elif self.current_state == "PAUSED":
                 self.game.handle_pause_menu_events(event)
-            elif self.current_state in ["GAME_OVER", "ESCAPED", "ESCAPING", "ELECTROCUTED", "ESCAPED_INPUT_NAME", "DESTRUCTION"]:
+            elif self.current_state in ["GAME_OVER", "ESCAPED", "ESCAPING", "ELECTROCUTED", "ESCAPED_INPUT_NAME", "DESTRUCTION", "LEVEL_COMPLETE"]:
                 self.game.handle_end_screen_events(event)
             elif self.current_state == "HIGH_SCORES":
                 self.game.handle_high_scores_events(event)
@@ -61,6 +61,10 @@ class GameStateManager:
             self.game.run_escaped_draw(screen)
         elif self.current_state == "ESCAPED_INPUT_NAME":
             self.game.run_escaped_input_name_draw(screen)
+        elif self.current_state == "LEVEL_COMPLETE":
+            self.game.run_level_complete_draw(screen)
+        elif self.current_state == "LEVEL_COMPLETE":
+            self.game.run_level_complete_draw(screen)
         elif self.current_state == "ESCAPING":
             self.game.run_game_draw(screen) # Draw game elements during escaping animation
         elif self.current_state == "ELECTROCUTED":

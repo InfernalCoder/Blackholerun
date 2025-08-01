@@ -13,6 +13,7 @@ from ball_lightning_mine_module import BallLightningMine
 from ship_destruction_cinematic import ShipDestructionCinematic
 from asteroid_destruction_module import create_asteroid_debris, create_exploding_debris
 from crystal_module import Crystal, load_crystal_texture, CRYSTAL_COLORS
+from pirate_module import Pirate, PirateProjectile
 
 import os
 
@@ -75,6 +76,11 @@ class Game:
         self.offset_x = 0
         self.offset_y = 0
 
+        self.current_level_number = 1
+        self.current_level_data = None
+        self.level_timer = 0
+        self.level_sounds = {}
+
         self.menu_music_path = os.path.join(ASSET_PATH, "stellar_thrills.mp3")
         self.game_music_path = os.path.join(ASSET_PATH, "guideons_wrath.mp3")
         self.current_music_path = None
@@ -102,11 +108,12 @@ class Game:
         self.fps = 120
 
         self.load_assets()
-        self.initialize_game_objects()
         self.initialize_ui_elements()
-        
+
         self.state_manager = GameStateManager("SPLASH", self)
         self.manage_music()
+
+        self.initialize_game_objects()
 
     def load_assets(self):
         load_asteroid_textures()
@@ -160,6 +167,20 @@ class Game:
             except pygame.error as e:
                 print(f"Could not load sound {sound_path}: {e}")
 
+        self.pirate_laser_sound = None
+        try:
+            self.pirate_laser_sound = pygame.mixer.Sound(os.path.join(ASSET_PATH, "laser01.mp3"))
+            self.pirate_laser_sound.set_volume(0.6) # Adjusted volume to 0.6
+        except pygame.error as e:
+            print(f"Could not load laser01.mp3: {e}")
+
+        self.slow_down_sound = None
+        try:
+            self.slow_down_sound = pygame.mixer.Sound(os.path.join(ASSET_PATH, "vo_slow_down.mp3"))
+            self.slow_down_sound.set_volume(1.0)
+        except pygame.error as e:
+            print(f"Could not load vo_slow_down.mp3: {e}")
+
         try:
             pygame.mixer.music.load(os.path.join(ASSET_PATH, "stellar_thrills.mp3"))
             pygame.mixer.music.play(-1)
@@ -206,6 +227,8 @@ class Game:
         self.cinematic_player = None # New: To manage the cinematic
         self.sucking_debris = [] # New list for asteroid debris
         self.exploding_debris = [] # New list for exploding debris
+        self.pirates = [] # New list for pirates
+        self.pirate_projectiles = [] # New list for pirate projectiles
         self.reset_game_variables()
 
     def initialize_ui_elements(self):
@@ -224,6 +247,7 @@ class Game:
         self.timer_font = pygame.font.Font(font_path, 24)
         self.dilation_font = pygame.font.Font(font_path, 24)
         self.how_to_play_font = pygame.font.Font(font_path, 20)
+        self.level_font = pygame.font.Font(font_path, 24)
 
         # Colors
         self.light_green = (144, 238, 144)
@@ -283,6 +307,20 @@ class Game:
         self.quit_pause_text = self.start_font.render("Quit (Q)", True, self.light_green)
         self.quit_pause_rect = self.quit_pause_text.get_rect(center=(self.original_screen_width // 2, self.original_screen_height // 2 + 90))
 
+        # Level Complete Text
+        self.level_complete_font_large = pygame.font.Font(font_path, 74)
+        self.level_complete_text = self.level_complete_font_large.render("LEVEL COMPLETE!", True, self.light_green)
+        self.level_complete_rect = self.level_complete_text.get_rect(center=(self.original_screen_width // 2, self.original_screen_height // 3))
+
+        self.next_level_text = self.game_over_font_small.render("Press 'ENTER' for next level", True, self.light_green)
+        self.next_level_rect = self.next_level_text.get_rect(center=(self.original_screen_width // 2, self.original_screen_height // 2))
+
+        self.return_to_menu_level_text = self.game_over_font_small.render("Press 'M' to return to Menu", True, self.light_green)
+        self.return_to_menu_level_rect = self.return_to_menu_level_text.get_rect(center=(self.original_screen_width // 2, self.original_screen_height // 2 + 50))
+
+        self.quit_level_text = self.game_over_font_small.render("Press 'Q' to quit", True, self.light_green)
+        self.quit_level_rect = self.quit_level_text.get_rect(center=(self.original_screen_width // 2, self.original_screen_height * 2 / 3))
+
         # Jitter effect variables
         self.jitter_timer = random.uniform(0.5, 1.5) * self.fps
         self.jitter_active = False
@@ -290,6 +328,48 @@ class Game:
         self.jitter_flash_duration = 2 # Duration of each flash in frames
         self.jitter_flash_timer = 0
         self.current_jitter_surface = None
+
+        # Level Intro Animation
+        self.level_intro_font_initial_size = 200
+        self.level_intro_active = False
+        self.level_intro_timer = 0
+        self.level_intro_hold_duration = 30  # Hold for 0.5 seconds at 60fps
+        self.level_intro_fade_duration = 90  # Fade over 1.5 seconds
+        self.level_intro_total_duration = self.level_intro_hold_duration + self.level_intro_fade_duration
+        self.level_intro_font = pygame.font.Font(font_path, self.level_intro_font_initial_size)
+
+    def load_level(self, level_number):
+        print(f"Attempting to load level: {level_number}")
+        level_path = os.path.join(ASSET_PATH, 'levels', f'level_{level_number}.json')
+        try:
+            with open(level_path, 'r') as f:
+                self.current_level_data = json.load(f)
+                self.level_events = list(self.current_level_data['events'])
+                self.survival_timer = self.current_level_data['duration'] * self.fps
+                self.level_timer = 0
+                self.level_sounds.clear()
+                for event in self.level_events:
+                    if 'sound' in event:
+                        sound_file = event['sound']
+                        if sound_file not in self.level_sounds:
+                            try:
+                                sound_path = os.path.join(ASSET_PATH, sound_file)
+                                self.level_sounds[sound_file] = pygame.mixer.Sound(sound_path)
+                                print(f"Successfully loaded sound: {sound_file}")
+                            except pygame.error as e:
+                                print(f"Warning: Could not load sound '{sound_file}': {e}")
+                print(f"Successfully loaded Level {level_number}: {self.current_level_data['level_name']}")
+            if 'music' in self.current_level_data:
+                self.game_music_path = os.path.join(ASSET_PATH, self.current_level_data['music'])
+                self.manage_music()
+            return True
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            print(f"Error loading level {level_number}: {e}. Starting escape sequence.")
+            self.state_manager.set_state("ESCAPING")
+            self.initial_escape_angle = self.player_ship.angle
+            self.total_angle_rotated_in_escape = 0
+            self.escape_rotations_completed = 0
+            return False
 
     def reset_game_variables(self):
         pygame.time.set_timer(pygame.USEREVENT + 1, 0) # Disable any lingering game over timers
@@ -304,6 +384,9 @@ class Game:
         self.cinematic_player = None # Reset cinematic player
         self.sucking_debris.clear() # Clear asteroid debris
         self.exploding_debris.clear()
+        self.pirates.clear()
+        self.pirate_projectiles.clear()
+        self.level_sounds.clear()
         self.following_charge.deactivate()
         self.charge_spawn_timer = 0
         self.dilation_score = 0
@@ -324,6 +407,15 @@ class Game:
         self.total_angle_rotated_in_escape = 0.0
         self.electrocuted_timer = 0
         self.electrocuted_duration = 90 # Duration of the electrocution effect in frames
+        self.asteroid_hit_counter = 0
+
+        # Level system variables
+        if self.load_level(self.current_level_number):
+            self.start_level_intro()
+
+    def start_level_intro(self):
+        self.level_intro_active = True
+        self.level_intro_timer = self.level_intro_total_duration
 
     def on_enter_high_scores_state(self):
         self.current_high_scores = load_high_scores()
@@ -339,6 +431,7 @@ class Game:
     def handle_splash_screen_events(self, event):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_n:
+                self.current_level_number = 1 # Ensure starting at level 1
                 self.state_manager.set_state("GAME")
                 self.reset_game_variables()
             elif event.key == pygame.K_p:
@@ -385,7 +478,23 @@ class Game:
         else:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN:
-                    self.state_manager.set_state("SPLASH")
+                    if self.state_manager.get_state() == "LEVEL_COMPLETE":
+                        print(f"ENTER pressed on LEVEL_COMPLETE. Incrementing level from {self.current_level_number} to {self.current_level_number + 1}")
+                        self.current_level_number += 1
+                        # reset_game_variables will call load_level, which might change state to ESCAPED
+                        self.reset_game_variables()
+
+                        # Check if load_level changed the state to ESCAPED (meaning level not found)
+                        if self.state_manager.get_state() != "ESCAPED":
+                            # Only transition to GAME if it's not already ESCAPED
+                            self.state_manager.set_state("GAME")
+                        # Else, if it's ESCAPED, load_level already handled the state transition.
+                    else: # Handles K_RETURN for GAME_OVER, ESCAPED, etc.
+                        self.state_manager.set_state("SPLASH")
+                elif event.key == pygame.K_m:
+                    if self.state_manager.get_state() == "LEVEL_COMPLETE":
+                        self.reset_game_variables() # Reset all game stats
+                        self.state_manager.set_state("SPLASH") # Go to main menu
                 elif event.key == pygame.K_q:
                     pygame.quit()
                     sys.exit()
@@ -505,11 +614,16 @@ class Game:
     def run_game_update(self):
         # Only update the ship and handle interactions if it's not destroyed
         if not self.player_ship.is_destroyed:
-            self.player_ship.update()
-            self.handle_dilation()
-            self.handle_spawning()
-            self.handle_collisions()
-            self.survival_timer -= 1
+            if self.level_intro_active:
+                self.level_intro_timer -= 1
+                if self.level_intro_timer <= 0:
+                    self.level_intro_active = False
+            else:
+                self.player_ship.update()
+                self.handle_dilation()
+                self.handle_spawning()
+                self.handle_collisions()
+                self.survival_timer -= 1
         
         # These should continue to update for ambiance
         for star in self.stars:
@@ -535,6 +649,16 @@ class Game:
             if debris.lifetime <= 0:
                 self.exploding_debris.remove(debris)
 
+        for pirate in self.pirates[:]:
+            pirate.update()
+            if pirate.is_destroyed:
+                self.pirates.remove(pirate)
+        
+        for projectile in self.pirate_projectiles[:]:
+            projectile.update()
+            if projectile.lifetime <= 0:
+                self.pirate_projectiles.remove(projectile)
+
         # Update ship debris after it's created
         if self.player_ship.is_destroyed:
             for piece in self.ship_debris[:]:
@@ -559,7 +683,8 @@ class Game:
             pygame.time.set_timer(pygame.USEREVENT + 1, 0) # Disable any lingering game over timers
 
         if self.survival_timer <= 0:
-            self.state_manager.set_state("ESCAPING")
+            self.current_level_number += 1
+            self.reset_game_variables()
 
     def handle_dilation(self):
         track_dilation_rate = [1, 0.20, 0.10][self.player_ship.track]
@@ -569,30 +694,42 @@ class Game:
         self.dilation_score += track_dilation_rate * dilation_modifier
 
     def handle_spawning(self):
-        # Force BallLightningMine spawn every 10 seconds for testing
-        self.mine_spawn_timer += 1
-        if self.mine_spawn_timer >= self.mine_spawn_interval:
-            self.obstacles.append(BallLightningMine(random.randint(0, 2), self))
-            print("  - FORCED Spawning BallLightningMine")
-            self.mine_spawn_timer = 0 # Reset timer
+        if not self.current_level_data: # Should not happen if level is loaded correctly
+            return
 
-        # Original spawning logic (can be commented out or adjusted as needed)
-        if not self.speed_boosts and random.random() < 0.01:
-            self.speed_boosts.append(SpeedBoost(random.randint(0, 2), self))
-        if not self.power_ups and random.random() < 0.002:
-            self.power_ups.append(PowerUp(random.randint(0, 2), self))
-        if len(self.obstacles) < 5 and random.random() < 0.008: # Overall obstacle spawn chance
-            spawn_type_roll = random.random()
-            if spawn_type_roll < 0.2: # 20% chance for ExplodingObstacle (relative to 0.008)
-                self.obstacles.append(ExplodingObstacle(random.randint(0, 2), self))
-            elif spawn_type_roll < 0.2 + 0.02: # 2% chance for BallLightningMine (relative to 0.008)
-                # This will now be overridden by the forced spawn for testing
-                pass
-            else: # Remaining chance for regular Obstacle
-                self.obstacles.append(Obstacle(random.randint(0, 2), self))
-        self.charge_spawn_timer += 1
-        if not self.following_charge.active and self.charge_spawn_timer >= 300:
-            self.following_charge.activate()
+        # Convert frame-based level_timer to seconds
+        current_time_in_seconds = self.level_timer / self.fps
+
+        # Use a copy of the list to allow removal while iterating
+        for event in self.level_events[:]:
+            if current_time_in_seconds >= event['time']:
+                print(f"Event triggered: {event['type']} at {current_time_in_seconds:.2f} seconds")
+                # Spawn the object based on the event type
+                event_type = event['type']
+                track = event.get('track') # .get() is safer if track isn't always present
+
+                if event_type == "ASTEROID":
+                    self.obstacles.append(Obstacle(track, self))
+                elif event_type == "EXPLODING_ASTEROID":
+                    self.obstacles.append(ExplodingObstacle(track, self))
+                elif event_type == "MINE":
+                    self.obstacles.append(BallLightningMine(track, self))
+                elif event_type == "SPEED_BOOST":
+                    self.speed_boosts.append(SpeedBoost(track, self))
+                elif event_type == "POWERUP_ENERGY":
+                    self.power_ups.append(PowerUp(track, self))
+                elif event_type == "FOLLOWING_CHARGE":
+                    if not self.following_charge.active:
+                        self.following_charge.activate()
+                elif event_type == "PIRATE":
+                    self.pirates.append(Pirate(track, self))
+
+                if 'sound' in event and event['sound'] in self.level_sounds:
+                    self.level_sounds[event['sound']].play()
+
+                self.level_events.remove(event)
+
+        self.level_timer += 1
 
     def handle_collisions(self):
         # Ship with Speed Boosts
@@ -635,6 +772,9 @@ class Game:
                     else:
                         damage = 10 if isinstance(obstacle, ExplodingObstacle) else 5
                         self.player_ship.take_damage(damage)
+                        self.asteroid_hit_counter += 1
+                        if self.asteroid_hit_counter == 3 and self.slow_down_sound:
+                            self.slow_down_sound.play()
 
                         if isinstance(obstacle, ExplodingObstacle):
                             obstacle.exploded = True
@@ -654,6 +794,22 @@ class Game:
                             animated_color = tuple(min(255, int(c * (0.5 + brightness_factor * 0.5))) for c in base_color)
                             self.sucking_debris.extend(create_asteroid_debris(asteroid_image_to_shatter, obstacle_x, obstacle_y, self, animated_color))
 
+        # Pirates with Obstacles
+        for pirate in self.pirates[:]:
+            for obstacle in self.obstacles[:]:
+                if isinstance(obstacle, BallLightningMine):
+                    if obstacle.state == 'exploding' and pirate.track == obstacle.track:
+                        pirate.take_damage(1000) # Instant destruction
+                else:
+                    # Pirate takes damage from regular/exploding asteroids
+                    obstacle_x = self.original_screen_width // 2 + obstacle.radius * math.cos(obstacle.angle)
+                    obstacle_y = self.original_screen_height // 2 + obstacle.radius * math.sin(obstacle.angle)
+                    if check_collision(pirate.pirate_radius, pirate.x, pirate.y, obstacle.obstacle_radius, obstacle_x, obstacle_y):
+                        pirate.take_damage(10) # Pirate takes 10 damage from asteroid
+                        self.obstacles.remove(obstacle) # Asteroid is destroyed
+                        if self.rock_break_sounds:
+                            random.choice(self.rock_break_sounds).play()
+
         # Ship with Following Charge
         if self.following_charge.active:
             if check_collision(self.player_ship.radius, self.player_ship.x, self.player_ship.y, self.following_charge.radius, self.following_charge.position[0], self.following_charge.position[1]):
@@ -663,6 +819,32 @@ class Game:
                     self.player_ship.deactivate_shield()
                 else:
                     self.state_manager.set_state("ELECTROCUTED")
+
+        # Ship with Pirate Projectiles
+        for projectile in self.pirate_projectiles[:]:
+            if check_collision(self.player_ship.radius, self.player_ship.x, self.player_ship.y, projectile.radius, projectile.x, projectile.y):
+                if self.player_ship.shield_active:
+                    self.player_ship.deactivate_shield()
+                else:
+                    self.player_ship.take_damage(projectile.damage)
+                self.pirate_projectiles.remove(projectile)
+                self.particle_effects.append(ExplosionParticleSystem((projectile.x, projectile.y), projectile.color))
+
+        # Pirate Projectiles with Obstacles
+        for projectile in self.pirate_projectiles[:]:
+            for obstacle in self.obstacles[:]:
+                if not isinstance(obstacle, BallLightningMine):
+                    obstacle_x = self.original_screen_width // 2 + obstacle.radius * math.cos(obstacle.angle)
+                    obstacle_y = self.original_screen_height // 2 + obstacle.radius * math.sin(obstacle.angle)
+                    if check_collision(projectile.radius, projectile.x, projectile.y, obstacle.obstacle_radius, obstacle_x, obstacle_y):
+                        if projectile in self.pirate_projectiles:
+                            self.pirate_projectiles.remove(projectile)
+                        if obstacle in self.obstacles:
+                            self.obstacles.remove(obstacle)
+                        self.particle_effects.append(ExplosionParticleSystem((obstacle_x, obstacle_y), (255, 255, 255))) # White explosion
+                        if self.rock_break_sounds:
+                            random.choice(self.rock_break_sounds).play()
+                        break # Move to the next projectile once this one is destroyed
 
     def run_menu_draw(self, game_surface):
         game_surface.blit(self.background_image, (0, 0))
@@ -820,7 +1002,37 @@ class Game:
             debris.draw(game_surface)
         for debris in self.exploding_debris:
             debris.draw(game_surface)
+        for pirate in self.pirates:
+            pirate.draw(game_surface)
+        for projectile in self.pirate_projectiles:
+            projectile.draw(game_surface)
         self.draw_game_ui(game_surface)
+        if self.level_intro_active:
+            self.draw_level_intro(game_surface)
+
+    def draw_level_intro(self, game_surface):
+        if not self.level_intro_active:
+            return
+
+        if self.level_intro_timer > self.level_intro_fade_duration:
+            # Hold phase
+            progress = 1.0
+        else:
+            # Fade and shrink phase
+            progress = self.level_intro_timer / self.level_intro_fade_duration
+
+        alpha = int(255 * progress)
+        current_size = int(self.level_intro_font_initial_size * progress)
+
+        if alpha <= 0 or current_size <= 0:
+            return
+
+        font = pygame.font.Font(os.path.join(ASSET_PATH, 'font', 'Bladerounded-Regular.ttf'), current_size)
+        text_surface = font.render(f"LEVEL {self.current_level_number}", True, self.light_green)
+        text_surface.set_alpha(alpha)
+
+        text_rect = text_surface.get_rect(center=(self.original_screen_width // 2, self.original_screen_height // 2))
+        game_surface.blit(text_surface, text_rect)
 
     def draw_game_ui(self, game_surface):
         total_milliseconds = self.survival_timer * 1000 // self.fps
@@ -835,6 +1047,15 @@ class Game:
         game_surface.blit(energy_text_surface, (40, 100))
         structure_text_surface = self.timer_font.render(f"Hull Integrity: {int(self.player_ship.current_structure)}", True, self.light_green)
         game_surface.blit(structure_text_surface, (40, 130))
+
+        level_text_surface = self.level_font.render(f"Level: {self.current_level_number}", True, self.light_green)
+        game_surface.blit(level_text_surface, (40, 160))
+
+        # Level Title
+        if self.current_level_data and 'level_name' in self.current_level_data:
+            level_title_text = self.escaped_font.render(self.current_level_data['level_name'], True, self.light_green)
+            level_title_rect = level_title_text.get_rect(topright=(self.original_screen_width - 40, 40))
+            game_surface.blit(level_title_text, level_title_rect)
 
     def run_game_over_draw(self, game_surface):
         game_surface.blit(self.background_image, (0, 0))
@@ -1147,6 +1368,92 @@ class Game:
         return_text = self.start_font.render("Press ESC to return to Menu", True, self.light_green)
         return_rect = return_text.get_rect(center=(self.original_screen_width // 2, self.original_screen_height * 0.9))
         game_surface.blit(return_text, return_rect)
+
+    def run_high_scores_draw(self, game_surface):
+        game_surface.blit(self.background_image, (0, 0))
+        for star in self.stars:
+            star.update(0.01)  # Slow constant rotation
+            star.draw(game_surface)
+
+        # Draw the large crystal in the background
+        self.menu_crystal_large.update()
+        crystal_image = self.menu_crystal_large.get_current_image()
+        crystal_rect = crystal_image.get_rect(center=(self.original_screen_width // 2, self.original_screen_height // 2))
+        game_surface.blit(crystal_image, crystal_rect)
+
+        # Draw semi-transparent black box
+        box_width = int(self.original_screen_width * 0.6)
+        box_height = int(self.original_screen_height * 0.7)
+        box_x = (self.original_screen_width - box_width) // 2
+        box_y = self.original_screen_height // 8 - 50 # Start slightly above title, moved up by 30 pixels
+        
+        alpha_surface = pygame.Surface((box_width, box_height), pygame.SRCALPHA)
+        alpha_surface.fill((0, 0, 0, 100)) # Black with 100 alpha (out of 255)
+        game_surface.blit(alpha_surface, (box_x, box_y))
+
+        high_scores = self.current_high_scores
+
+        title_text = self.title_font.render("HIGH SCORES", True, self.light_green)
+        title_rect = title_text.get_rect(center=(self.original_screen_width // 2, self.original_screen_height // 8))
+        game_surface.blit(title_text, title_rect)
+
+        y_offset = self.original_screen_height // 4
+        if not high_scores:
+            no_scores_text = self.menu_item_font.render("No scores yet. Play a game to set one!", True, self.white)
+            no_scores_rect = no_scores_text.get_rect(center=(self.original_screen_width // 2, y_offset + 50))
+            game_surface.blit(no_scores_text, no_scores_rect)
+        else:
+            header_name_text = self.escaped_font.render("NAME", True, self.white)
+            header_score_text = self.escaped_font.render("SCORE", True, self.white)
+
+            # Calculate positions to center them over their respective columns
+            # The score list is centered at original_screen_width // 2
+            # The name list is to the left of it, with 15 characters padding
+            name_x_pos = (self.original_screen_width // 2) - (header_name_text.get_width() // 2) - (self.menu_item_font.size(" ")[0] * 10) # 10 spaces for padding
+            score_x_pos = (self.original_screen_width // 2) + (header_score_text.get_width() // 2) + (self.menu_item_font.size(" ")[0] * 10) # 10 spaces for padding
+
+            game_surface.blit(header_name_text, (name_x_pos, y_offset - 20))
+            game_surface.blit(header_score_text, (score_x_pos - header_score_text.get_width(), y_offset - 20)) # Adjust score_x_pos to blit from left
+            y_offset += 40
+
+            for i, entry in enumerate(high_scores[:10]): # Display top 10 scores
+                player_name = entry.get('name', '---') # Safely get name, default to '---' if not present
+                score_line = f"{player_name:<15} {entry['score']:,}"
+                score_text = self.menu_item_font.render(score_line, True, self.white)
+                score_rect = score_text.get_rect(center=(self.original_screen_width // 2, y_offset + i * 35))
+                shadow_score_text = self.menu_item_font.render(score_line, True, (0,0,0)) # Black shadow
+                game_surface.blit(shadow_score_text, (score_rect.x + 3, score_rect.y + 3))
+                game_surface.blit(score_text, score_rect)
+        
+        return_text = self.start_font.render("Press ESC to return to Menu", True, self.light_green)
+        return_rect = return_text.get_rect(center=(self.original_screen_width // 2, self.original_screen_height * 0.9))
+        game_surface.blit(return_text, return_rect)
+
+    def run_level_complete_draw(self, game_surface):
+        game_surface.blit(self.escaped_splash_image, (0, 0)) # Use escaped splash for now
+
+        # Text with Shadows
+        shadow_color = (0, 0, 0) # Black shadow
+
+        # Level Complete Text
+        shadow_level_complete_text = self.level_complete_font_large.render("LEVEL COMPLETE!", True, shadow_color)
+        game_surface.blit(shadow_level_complete_text, (self.level_complete_rect.x + 3, self.level_complete_rect.y + 3))
+        game_surface.blit(self.level_complete_text, self.level_complete_rect)
+
+        # Next Level Text
+        shadow_next_level_text = self.game_over_font_small.render("Press 'ENTER' for next level", True, shadow_color)
+        game_surface.blit(shadow_next_level_text, (self.next_level_rect.x + 3, self.next_level_rect.y + 3))
+        game_surface.blit(self.next_level_text, self.next_level_rect)
+
+        # Return to Menu Text
+        shadow_return_to_menu_level_text = self.game_over_font_small.render("Press 'M' to return to Menu", True, shadow_color)
+        game_surface.blit(shadow_return_to_menu_level_text, (self.return_to_menu_level_rect.x + 3, self.return_to_menu_level_rect.y + 3))
+        game_surface.blit(self.return_to_menu_level_text, self.return_to_menu_level_rect)
+
+        # Quit Text
+        shadow_quit_level_text = self.game_over_font_small.render("Press 'Q' to quit", True, shadow_color)
+        game_surface.blit(shadow_quit_level_text, (self.quit_level_rect.x + 3, self.quit_level_rect.y + 3))
+        game_surface.blit(self.quit_level_text, self.quit_level_rect)
 
     def save_score_if_needed(self):
         if not self.score_saved_for_current_game:

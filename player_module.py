@@ -139,7 +139,7 @@ class Ship:
 
         # Track layout properties from the main game
         self.track_width = 40
-        self.track_spacing_multiplier = 2.5
+        self.track_spacing_multiplier = 1.5
         self.orbital_radius_base = 150
         self.is_destroyed = False
         
