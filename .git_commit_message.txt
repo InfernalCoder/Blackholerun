@@ -1,7 +1,7 @@
-feat: Add dynamic explosion effects and music
+feat: Add pirate module, new assets, and level files
 
-- Implemented a multi-layered, colored explosion for the ExplodingObstacle.
-- Added particle debris that flies outwards when an ExplodingObstacle is destroyed.
-- Added random explosion sounds for both regular and exploding asteroids.
-- Implemented a music manager to switch between menu and gameplay music tracks.
-- Fixed a bug that caused the ship to be instantly destroyed by exploding asteroids.
+- Implemented the initial `pirate_module.py`.
+- Added new sound effects for lasers and voice-overs.
+- Added new ship image and level configuration files.
+- Included a new backup of the project.
+- Updated game logic in `black_hole_runV08.py`, `game_state_module.py`, `particle_module.py`, and `player_module.py`.

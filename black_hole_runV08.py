@@ -75,7 +75,7 @@ class Game:
         self.scale_factor = 1.0
         self.offset_x = 0
         self.offset_y = 0
-
+        self.name_input_max_length = 8
         self.current_level_number = 1
         self.current_level_data = None
         self.level_timer = 0
@@ -101,6 +101,7 @@ class Game:
         self.slow_motion_factor = 1.0
         self.zoom_level = 1.0
         self.zoom_target = (0, 0)
+        self.electrocuted_duration = 90
 
         pygame.display.set_caption("Black Hole Run")
 
@@ -229,7 +230,7 @@ class Game:
         self.exploding_debris = [] # New list for exploding debris
         self.pirates = [] # New list for pirates
         self.pirate_projectiles = [] # New list for pirate projectiles
-        self.reset_game_variables()
+        self.reset_for_new_game()
 
     def initialize_ui_elements(self):
         # Font path
@@ -371,45 +372,44 @@ class Game:
             self.escape_rotations_completed = 0
             return False
 
-    def reset_game_variables(self):
-        pygame.time.set_timer(pygame.USEREVENT + 1, 0) # Disable any lingering game over timers
+    def reset_for_new_game(self):
+        """Resets all game variables for a completely new game."""
         self.player_ship.reset()
+        self.dilation_score = 0
+        self.num_boosts_collected = 0
+        self.final_score = 0
+        self.current_level_number = 1
+        self.target_rotations = 2 # Number of rotations before accelerating off-screen
+        self.reset_level_specific_variables()
+
+    def reset_level_specific_variables(self):
+        """Resets variables that should be cleared at the start of each level."""
+        pygame.time.set_timer(pygame.USEREVENT + 1, 0)
         self.survival_timer_start_time = pygame.time.get_ticks()
-        self.survival_timer = 60 * self.fps
         self.speed_boosts.clear()
         self.power_ups.clear()
         self.obstacles.clear()
         self.particle_effects.clear()
         self.ship_debris.clear()
-        self.cinematic_player = None # Reset cinematic player
-        self.sucking_debris.clear() # Clear asteroid debris
+        self.cinematic_player = None
+        self.sucking_debris.clear()
         self.exploding_debris.clear()
         self.pirates.clear()
         self.pirate_projectiles.clear()
         self.level_sounds.clear()
         self.following_charge.deactivate()
         self.charge_spawn_timer = 0
-        self.dilation_score = 0
-        self.num_boosts_collected = 0
         self.score_saved_for_current_game = False
         self.player_name_input = ""
         self.name_input_active = False
         self.name_input_cursor_visible = True
         self.name_input_cursor_timer = 0
-        self.name_input_max_length = 8
-        self.mine_spawn_timer = 0 # Initialize mine spawn timer
-        self.mine_spawn_interval = 10 * self.fps # 10 seconds * FPS
+        self.mine_spawn_timer = 0
         self.escape_rotations_completed = 0
-        self.target_rotations = 2 # Number of rotations before accelerating off-screen
-        self.initial_escape_angle = 0 # To track full rotations
-        self.initial_escape_orbital_radius = 0.0
-        self.initial_escape_tangential_speed = 0.0
         self.total_angle_rotated_in_escape = 0.0
         self.electrocuted_timer = 0
-        self.electrocuted_duration = 90 # Duration of the electrocution effect in frames
         self.asteroid_hit_counter = 0
 
-        # Level system variables
         if self.load_level(self.current_level_number):
             self.start_level_intro()
 
@@ -433,7 +433,7 @@ class Game:
             if event.key == pygame.K_n:
                 self.current_level_number = 1 # Ensure starting at level 1
                 self.state_manager.set_state("GAME")
-                self.reset_game_variables()
+                self.reset_for_new_game()
             elif event.key == pygame.K_p:
                 self.state_manager.set_state("MENU")
             elif event.key == pygame.K_h:
@@ -452,8 +452,7 @@ class Game:
                 self.player_ship.activate_shield()
             elif event.key == pygame.K_ESCAPE:
                 self.state_manager.set_state("PAUSED")
-            elif event.key == pygame.K_ESCAPE:
-                self.state_manager.set_state("PAUSED")
+
         elif event.type == pygame.KEYUP:
             if event.key == pygame.K_SPACE:
                 self.player_ship.deactivate_shield()
@@ -481,20 +480,16 @@ class Game:
                     if self.state_manager.get_state() == "LEVEL_COMPLETE":
                         print(f"ENTER pressed on LEVEL_COMPLETE. Incrementing level from {self.current_level_number} to {self.current_level_number + 1}")
                         self.current_level_number += 1
-                        # reset_game_variables will call load_level, which might change state to ESCAPED
-                        self.reset_game_variables()
+                        self.reset_level_specific_variables()
 
-                        # Check if load_level changed the state to ESCAPED (meaning level not found)
                         if self.state_manager.get_state() != "ESCAPED":
-                            # Only transition to GAME if it's not already ESCAPED
                             self.state_manager.set_state("GAME")
-                        # Else, if it's ESCAPED, load_level already handled the state transition.
-                    else: # Handles K_RETURN for GAME_OVER, ESCAPED, etc.
+                    else:
                         self.state_manager.set_state("SPLASH")
                 elif event.key == pygame.K_m:
                     if self.state_manager.get_state() == "LEVEL_COMPLETE":
-                        self.reset_game_variables() # Reset all game stats
-                        self.state_manager.set_state("SPLASH") # Go to main menu
+                        self.reset_for_new_game()
+                        self.state_manager.set_state("SPLASH")
                 elif event.key == pygame.K_q:
                     pygame.quit()
                     sys.exit()
@@ -588,19 +583,6 @@ class Game:
                 pygame.quit()
                 sys.exit()
 
-    def handle_pause_menu_events(self, event):
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_c:
-                self.state_manager.set_state("GAME")
-            elif event.key == pygame.K_m:
-                self.state_manager.set_state("SPLASH")
-            elif event.key == pygame.K_q:
-                pygame.quit()
-                sys.exit()
-
-    
-
-
     def run_electrocuted_draw(self, game_surface):
         game_surface.fill(self.dark_purple) # Clear game_surface
         for star in self.stars:
@@ -684,7 +666,7 @@ class Game:
 
         if self.survival_timer <= 0:
             self.current_level_number += 1
-            self.reset_game_variables()
+            self.reset_level_specific_variables()
 
     def handle_dilation(self):
         track_dilation_rate = [1, 0.20, 0.10][self.player_ship.track]
@@ -1151,12 +1133,7 @@ class Game:
         game_surface.blit(self.quit_text, self.quit_rect)"""
 
     def run_escaped_draw(self, game_surface):
-        # Calculate final score
-        if self.dilation_score > 0:
-            processed_dilation = 1
-        else:
-            processed_dilation = abs(self.dilation_score)
-        final_score = processed_dilation * self.num_boosts_collected * 100
+        self.final_score = self.calculate_final_score()
 
         # Determine the high score threshold dynamically
         current_high_scores = load_high_scores()
@@ -1166,10 +1143,10 @@ class Game:
             # Get the 10th score (lowest in top 10) and set threshold to 1 above it
             dynamic_threshold = current_high_scores[9]['score'] + 1
 
-        print(f"Final Score: {final_score}, Dynamic Threshold: {dynamic_threshold}")
+        print(f"Final Score: {self.final_score}, Dynamic Threshold: {dynamic_threshold}")
 
         # Check if score qualifies for high score entry
-        if final_score >= dynamic_threshold:
+        if self.final_score >= dynamic_threshold:
             self.state_manager.set_state("ESCAPED_INPUT_NAME")
             return # Exit to let the new state handle drawing
 
@@ -1192,9 +1169,9 @@ class Game:
         game_surface.blit(final_score_label_text, final_score_label_rect)
 
         # Final Score Value
-        final_score_value_text = self.escaped_font.render(f"{int(final_score):,}", True, self.light_green)
+        final_score_value_text = self.escaped_font.render(f"{int(self.final_score):,}", True, self.light_green)
         final_score_value_rect = final_score_value_text.get_rect(midleft=(self.original_screen_width // 2 + 40, self.original_screen_height // 2))
-        shadow_final_score_value_text = self.escaped_font.render(f"{int(final_score):,}", True, shadow_color)
+        shadow_final_score_value_text = self.escaped_font.render(f"{int(self.final_score):,}", True, shadow_color)
         game_surface.blit(shadow_final_score_value_text, (final_score_value_rect.x + 3, final_score_value_rect.y + 3))
         game_surface.blit(final_score_value_text, final_score_value_rect)
 
@@ -1218,7 +1195,6 @@ class Game:
         game_surface.blit(shadow_escaped_message_text, (self.escaped_rect.x + 3, self.escaped_rect.y + 3))
         game_surface.blit(self.escaped_message_text, self.escaped_rect)
 
-        final_score = (abs(self.dilation_score) if self.dilation_score < 0 else 1) * self.num_boosts_collected * 100
 
         # Final Score Label
         final_score_label_text = self.escaped_font.render("Final Score:", True, self.light_green)
@@ -1228,9 +1204,9 @@ class Game:
         game_surface.blit(final_score_label_text, final_score_label_rect)
 
         # Final Score Value
-        final_score_value_text = self.escaped_font.render(f"{int(final_score):,}", True, self.light_green)
+        final_score_value_text = self.escaped_font.render(f"{int(self.final_score):,}", True, self.light_green)
         final_score_value_rect = final_score_value_text.get_rect(midleft=(self.original_screen_width // 2 + 40, self.original_screen_height // 2 - 50))
-        shadow_final_score_value_text = self.escaped_font.render(f"{int(final_score):,}", True, shadow_color)
+        shadow_final_score_value_text = self.escaped_font.render(f"{int(self.final_score):,}", True, shadow_color)
         game_surface.blit(shadow_final_score_value_text, (final_score_value_rect.x + 3, final_score_value_rect.y + 3))
         game_surface.blit(final_score_value_text, final_score_value_rect)
 
@@ -1455,15 +1431,34 @@ class Game:
         game_surface.blit(shadow_quit_level_text, (self.quit_level_rect.x + 3, self.quit_level_rect.y + 3))
         game_surface.blit(self.quit_level_text, self.quit_level_rect)
 
+    def calculate_final_score(self):
+        hull_bonus = 1  # Default bonus
+        if self.dilation_score > 0:
+            processed_dilation = 1
+        else:
+            processed_dilation = abs(self.dilation_score)
+
+        # Bonus for perfect hull
+        if self.player_ship.current_structure >= 200:
+            hull_bonus = 10
+
+        # The final score is multiplied by half the remaining hull points.
+        hull_modifier = self.player_ship.current_structure / 2
+        final_score = (processed_dilation * self.num_boosts_collected * hull_bonus) * hull_modifier
+
+        print("--- Final Score Calculation ---")
+        print(f"Processed Dilation: {processed_dilation}")
+        print(f"Boosts Collected: {self.num_boosts_collected}")
+        print(f"Hull Bonus: {hull_bonus}")
+        print(f"Hull Modifier (Current Hull / 2): {hull_modifier}")
+        print(f"Final Score = (Dilation * Boosts * Hull Bonus) * Hull Modifier = {final_score}")
+        print("-----------------------------")
+
+        return final_score
+
     def save_score_if_needed(self):
         if not self.score_saved_for_current_game:
-            time_survived_ms = pygame.time.get_ticks() - self.survival_timer_start_time
-            if self.dilation_score > 0:
-                processed_dilation = 1
-            else:
-                processed_dilation = abs(self.dilation_score)
-            final_score = processed_dilation * self.num_boosts_collected * 100
-            save_final_score(self.player_name_input, final_score)
+            save_final_score(self.player_name_input, self.final_score)
             self.score_saved_for_current_game = True
 
     def draw_paragraph(self, surface, text, font, color, rect, shadow_color=None):
